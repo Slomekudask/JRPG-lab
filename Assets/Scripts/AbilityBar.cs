@@ -91,7 +91,13 @@ public class AbilityBar : MonoBehaviour
             selectedAbility = ability;
         }
     }
+
+    public void DeselectAbility()
+    {
+        selectedAbility = null;
+    }
 }
+
 
 //public class Ability
 //{

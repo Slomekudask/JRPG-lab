@@ -11,8 +11,10 @@ public class JRPGGameManager : Singleton<JRPGGameManager>
     SelectableCharacter[] characters;
 
     public SelectableCharacter pointedCharacter;
+
+    public bool popperchicks;
     
-    public SelectableCharacter selectedCharacter
+    public SelectableCharacter selectedCharacter //это геттер - это переменная у которой есть функция порлучения и назначения
     {
         get { return _selectedCharacter; }
         set
@@ -21,7 +23,7 @@ public class JRPGGameManager : Singleton<JRPGGameManager>
             {
                 if (_selectedCharacter != null)
                 {
-                    _selectedCharacter.SendMessage("OnDeselected", SendMessageOptions.DontRequireReceiver);
+                    _selectedCharacter.SendMessage("OnDeselected", SendMessageOptions.DontRequireReceiver); // уведомляем объект который мы выбрали до этого о том что он более не избран. Путин уходи.
                 }
 
                 _selectedCharacter = value;
@@ -29,6 +31,8 @@ public class JRPGGameManager : Singleton<JRPGGameManager>
                 _selectedCharacter.SendMessage("OnSelected", SendMessageOptions.DontRequireReceiver);
 
                 ShowAbilityBar(_selectedCharacter);
+
+
             }
         }
     }
@@ -85,7 +89,7 @@ public class JRPGGameManager : Singleton<JRPGGameManager>
         }
     }
 
-    public void OnCharacterWasClicked(SelectableCharacter clickedCharacter)
+    public void OnCharacterWasClicked(SelectableCharacter clickedCharacter) //При клике на чара если он в нашей тиме то селектед станеи им
     {
         //Debug.Log("OnCharacterWasClicked "+character);
 
@@ -99,12 +103,19 @@ public class JRPGGameManager : Singleton<JRPGGameManager>
             if (selectedCharacter != null)
             {
                 var ability = abilityBar.getSelectedAbility();
-                selectedCharacter.UseAbility(ref ability, clickedCharacter);
+                if (ability.CanBeAppliedTo(clickedCharacter.gameObject))
+                {
+                    selectedCharacter.UseAbility(ref ability, clickedCharacter);
+                }
+                
             }
         }
     }
 
-    
+    public void Popping(bool pop)
+    {
+        popperchicks = pop;
+    }
 
     void ShowAbilityBar(SelectableCharacter character)
     {
@@ -124,5 +135,7 @@ public class JRPGGameManager : Singleton<JRPGGameManager>
         {
             abilityBar.gameObject.SetActive(false);
         }
+
+        abilityBar.DeselectAbility();
     }
 }

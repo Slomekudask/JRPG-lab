@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using UnityEngine;
 
 
-public enum TARGET_TYPE
+public enum TARGET_TYPE //Типы целей
 {
     ALL,
     FOES,
@@ -12,7 +12,7 @@ public enum TARGET_TYPE
     OBJECTS
 }
 
-public enum DISTANCE_TYPE
+public enum DISTANCE_TYPE //Типы дистанций
 {
     MELEE,
     RANGED,
@@ -33,7 +33,7 @@ public class Ability : MonoBehaviour
 
     SelectableCharacter character;
 
-    public void CreateAimingEffect(GameObject target)
+    public void CreateAimingEffect(GameObject target) //Создание эффекта при наведении на цель (подсветка)
     {
         if (effectPrefab != null)
         {
@@ -55,7 +55,7 @@ public class Ability : MonoBehaviour
         }
     }
 
-    public void DisableAimingEffect()
+    public void DisableAimingEffect() //Изничтожение эффекта наведения при убирании мышки
     {
         if (effectInstance != null)
             effectInstance.SetActive(false);
@@ -80,23 +80,23 @@ public class Ability : MonoBehaviour
         target.SendMessage("invokeCustomEvent", "OnHit" + name, SendMessageOptions.DontRequireReceiver);
     }
 
-    public bool CanBeAppliedTo(GameObject target)
+    public bool CanBeAppliedTo(GameObject target) //Проверка возможности применения
     {
 
-        var myChar = transform.GetComponentInParent<SelectableCharacter>();
+        var myChar = transform.GetComponentInParent<SelectableCharacter>(); //Получаем инфу о выделенном чаре (положение)
         if (myChar == null)
         {
             return false;
         }
 
-        var targetChar = target.GetComponent<SelectableCharacter>();
+        var targetChar = target.GetComponent<SelectableCharacter>(); //Получаем инфу о цели (враг/союзник и дистанция до него)
 
-        bool result = CanBeAppliedTypeCheck(myChar, targetChar) && CanBeAppliedDistanceCheck(myChar, targetChar);
+        bool result = CanBeAppliedTypeCheck(myChar, targetChar) && CanBeAppliedDistanceCheck(myChar, targetChar); //Сравнение возможности применения по типу и дистанции
 
         return result;
     }
 
-    bool CanBeAppliedTypeCheck(SelectableCharacter myChar, SelectableCharacter targetChar)
+    bool CanBeAppliedTypeCheck(SelectableCharacter myChar, SelectableCharacter targetChar) //Проверка применяемости по типу (враги-союзники)
     {
         switch (targetType)
         {
@@ -132,49 +132,141 @@ public class Ability : MonoBehaviour
         return true;
     }
 
-    bool CanBeAppliedDistanceCheck(SelectableCharacter myChar, SelectableCharacter targetChar)
+    /// <summary>
+    /// Возвращает ближайшего к myChar персонажа типа SelectableCharacter 
+    /// путем перебора сначала по близости на оси X, а затем выбирая ближайшего из них по оси Z
+    /// </summary>
+    /// <param name="myChar"></param>
+    /// <returns></returns>
+    SelectableCharacter FindClosestEnemy(SelectableCharacter myChar)
+    {
+        float closestEnemyDistanceX = Mathf.Infinity; // приравняли в рекорд бесконечность
+        SelectableCharacter closestEnemy = null; // приравняли что нету клозеста
+
+        List<SelectableCharacter> closestEnemiesByX = new List<SelectableCharacter>(); //массив перебора ближайших по Х
+
+        
+        var otherCharacters = FindObjectsOfType<SelectableCharacter>(); //найдем всех персонажей
+
+        foreach (SelectableCharacter otherChar in otherCharacters)
+        {
+            if (otherChar.characterSheet.teamId == myChar.characterSheet.teamId) //пропускаем персонажей своей команды
+            {
+                continue;
+            }
+
+            
+            var newAttackVector = (otherChar.gameObject.transform.position - myChar.gameObject.transform.position); //получим вектор направленный от нашего персонажа на врага - на того которого мы перебираем
+
+            var distance = Mathf.Abs(Mathf.Round(newAttackVector.x)); //дистанция до перебираемого врага. мы ещё и округляем
+
+            
+            if (distance < closestEnemyDistanceX) //наиболее близкого запишем
+            {
+                closestEnemiesByX.Clear(); //очистим список ближайших
+                
+                closestEnemyDistanceX = distance; //наименьшая дистанция по X теперь такая
+                
+                closestEnemy = otherChar; //ближайший враг
+                
+                closestEnemiesByX.Add(otherChar); //он лишь один среди ближайших по оси Х
+            }
+            else if (distance == closestEnemyDistanceX)
+            {
+                closestEnemiesByX.Add(otherChar); //другие враги столь же близкие по оси Х добавляем в массив
+            }
+        }
+        Debug.Log("Число врагов в ближайшем не пустом ряду " + closestEnemiesByX.Count);
+
+        var closestEnemyDistanceZ = Mathf.Infinity;
+
+        //найдем ближайнего по Z из тех, кто в ближайшем непустом ряду по X
+        foreach (var enemy in closestEnemiesByX)
+        {
+            var newAttackVector = (enemy.gameObject.transform.position - myChar.gameObject.transform.position);
+            float distance = Mathf.Abs(newAttackVector.z);
+
+            if (distance <= closestEnemyDistanceZ)
+            {
+                closestEnemyDistanceZ = distance;
+                closestEnemy = enemy;
+            }
+        }
+
+        return closestEnemy;
+    }
+
+    bool AllyOnTheWay(SelectableCharacter myChar)
+    {
+        bool allyOnTheWay = false;
+        var otherCharacters = FindObjectsOfType<SelectableCharacter>(); //найдем всех персонажей
+
+        foreach (SelectableCharacter otherChar in otherCharacters)
+        {
+            if (otherChar.characterSheet.teamId == myChar.characterSheet.teamId)
+            {
+                var oneStep = myChar.transform.position.x + 0.1f;
+                if (otherChar.transform.position.x >= oneStep)
+                {
+                    allyOnTheWay = true;
+                    break;
+                }
+            }
+        }
+        return allyOnTheWay;
+    }
+
+    bool CanBeAppliedDistanceCheck(SelectableCharacter myChar, SelectableCharacter targetChar) //Проверка применяемости по дистанции
     {
         bool result = false;
-        var distance = (myChar.gameObject.transform.position - targetChar.gameObject.transform.position).magnitude;
-        if (distance <= MaxUseDistance)
+        switch (distanceType)
         {
-            switch (distanceType)
-            {
-                case DISTANCE_TYPE.MELEE:
-                    result = true;
-                    var rayStart = myChar.GetComponent<Collider>().bounds.center;
-                    var ray = new Ray(rayStart, targetChar.GetComponent<Collider>().bounds.center - rayStart);
-                    RaycastHit hitInfo;
-                    if (Physics.Raycast(ray, out hitInfo, MaxUseDistance))
-                    {
-                        Debug.DrawLine(ray.origin, hitInfo.point, Color.red, 1.0f);
-                        if (hitInfo.collider.gameObject == targetChar.gameObject)
+            case DISTANCE_TYPE.MELEE:
+                result = true;
+                var attackVector = (targetChar.gameObject.transform.position - myChar.gameObject.transform.position);
+                var distance = attackVector.magnitude;
+
+                if (distance <= MaxUseDistance)
+                {
+                    //Если цель находится в радиусе, значит можем бить всегда
+                    //Debug.Log("Can attack in radius " + distance);
+                }
+                else
+                {
+                        var onTheWay = AllyOnTheWay(myChar);
+                        if (onTheWay == true)
                         {
-                            result = true;
+                            result = false;
                         }
                         else
                         {
-                            result = false;
-                            Debug.Log(myChar.name + "CAN'T perform MELEE attack to " + targetChar.name + " due to occlusion");
+                            //Если цель делеко, то проверим, нет ли кого-то ближе
+                            var closestEnemy = FindClosestEnemy(myChar);
+                            if (closestEnemy != targetChar)
+                            {
+
+                                result = false;
+
+                                if (Mathf.Round(closestEnemy.transform.position.x) == Mathf.Round(targetChar.transform.position.x))
+                                {
+                                    if (Mathf.Abs(targetChar.transform.position.z - myChar.transform.position.z) <= MaxUseDistance)
+                                    {
+                                        result = true;
+                                    }
+                                }
+
+                                //Debug.LogWarning("Can't attack, closest enemy is " + closestEnemy.gameObject.name);
+                            }
+
                         }
-                    }
-                    else
-                    {
-                        Debug.DrawRay(ray.origin, ray.direction, Color.green, 1.0f);
-                    }
-                    break;
-                case DISTANCE_TYPE.RANGED:
-                    result = true;
-                    break;
-                case DISTANCE_TYPE.MAGICAL:
-                    result = true;
-                    break;
-            }
-        }
-        else
-        {
-            Debug.Log(myChar.name + "CAN'T perform attack to " + targetChar.name + " due to DISTANCE: " + distance + ">" + MaxUseDistance);
-            result = false;
+                }
+                break;
+            case DISTANCE_TYPE.RANGED:
+                result = true;
+                break;
+            case DISTANCE_TYPE.MAGICAL:
+                result = true;
+                break;
         }
         return result;
     }
